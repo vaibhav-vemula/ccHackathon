@@ -1,0 +1,77 @@
+version: "3.1"
+
+networks:
+  cc-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${SUBNET}
+
+services:
+  rabbitmq: 
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    container_name: "my-rabbit"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    restart: on-failure
+    networks:
+      cc-net:
+        ipv4_address: ${RABBITMQ_IP}
+
+  mongo:
+    image: mongo
+    hostname: mongo
+    container_name: "my-mongo"
+    ports:
+      - 27017:27017
+    restart: on-failure
+    networks:
+      cc-net:
+        ipv4_address: ${MONGO_IP}
+  
+  producer:
+    hostname: producer
+    build: 
+      context: ./producer/
+    container_name: producer-app
+    ports:
+      - ${PRODUCER_PORT}:${PRODUCER_PORT}
+    depends_on:
+      - rabbitmq
+    restart: on-failure
+    networks:
+      cc-net:
+        ipv4_address: ${PRODUCER_IP}
+
+  consumer:
+    hostname: consumer
+    build: 
+      context: ./rideMatchingConsumer/
+      args:
+        PRODUCER_IP: ${PRODUCER_IP}
+        PRODUCER_PORT: ${PRODUCER_PORT}
+        CONSUMER1_IP: ${CONSUMER1_IP}
+        CONSUMER1_NAME: ${CONSUMER1_NAME}
+    container_name: consumer-app
+    depends_on:
+      - producer
+    restart: on-failure
+    networks:
+      cc-net:
+        ipv4_address: ${CONSUMER1_IP}
+
+  database-consumer:
+    hostname: database-consumer
+    build: ./database-consumer/
+    container_name: database-consumer-app
+    depends_on:
+      - mongo
+      - producer
+      - consumer
+    restart: on-failure
+    networks:
+      cc-net:
+        ipv4_address: ${DATABASE_CONSUMER_IP}
